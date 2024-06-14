@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sensor Data</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f4;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        table, th, td {
+            border: 1px solid #ddd;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #0074D9; /* Blue color */
+            color: white;
+        }
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        /* Apply color coding based on mq135_analog_value */
+        td[data-range="low"] {
+            color: black;
+        }
+        td[data-range="medium"] {
+            color: orange;
+        }
+        td[data-range="high"] {
+            color: red;
+        }
+    </style>
+</head>
+<body>
+    <h1>Sensor Data</h1>
+    <div>
+        <label for="ir-filter">IR Value:</label>
+        <select id="ir-filter">
+            <option value="all">All</option>
+            <option value="1">1</option>
+            <option value="0">0</option>
+        </select>
+        <label for="mq135-filter">MQ135 Analog Value:</label>
+        <select id="mq135-filter">
+            <option value="all">All</option>
+            <option value="low">Low (&lt; 300)</option>
+            <option value="medium">Moderate (300 - 600)</option>
+            <option value="high">High (&gt; 600)</option>
+        </select>
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th>IR Value</th>
+                <th>MQ135 Analog Value</th>
+                <th>MQ135 Digital Value</th>
+                <th>Timestamp</th>
+            </tr>
+        </thead>
+        <tbody id="data-table">
+        </tbody>
+    </table>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const irFilter = document.getElementById('ir-filter');
+            const mq135Filter = document.getElementById('mq135-filter');
+            let sensorData = [];
+
+            fetch('fetchdata.php')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    sensorData = data;
+                    displayData(sensorData);
+                })
+                .catch(error => console.error('Error fetching data:', error));
+
+            function displayData(data) {
+                const tableBody = document.getElementById('data-table');
+                tableBody.innerHTML = '';
+                data.forEach(row => {
+                    const tr = document.createElement('tr');
+                    let range = '';
+                    if (row.mq135_analog_value < 300) {
+                        range = 'low';
+                    } else if (row.mq135_analog_value >= 300 && row.mq135_analog_value <= 600) {
+                        range = 'medium';
+                    } else {
+                        range = 'high';
+                    }
+                    tr.innerHTML = `
+                        <td>${row.ir_value}</td>
+                        <td data-range="${range}">${row.mq135_analog_value}</td>
+                        <td>${row.mq135_digital_value}</td>
+                        <td>${row.timestamp}</td>
+                    `;
+                    tableBody.appendChild(tr);
+                });
+            }
+
+            function applyFilters() {
+                const irValue = irFilter.value;
+                const mq135Value = mq135Filter.value;
+
+                const filteredData = sensorData.filter(row => {
+                    const irMatch = irValue === 'all' || row.ir_value.toString() === irValue;
+                    let mq135Match = true;
+                    if (mq135Value === 'low') {
+                        mq135Match = row.mq135_analog_value < 300;
+                    } else if (mq135Value === 'medium') {
+                        mq135Match = row.mq135_analog_value >= 300 && row.mq135_analog_value <= 600;
+                    } else if (mq135Value === 'high') {
+                        mq135Match = row.mq135_analog_value > 600;
+                    }
+                    return irMatch && mq135Match;
+                });
+
+                displayData(filteredData);
+            }
+
+            irFilter.addEventListener('change', applyFilters);
+            mq135Filter.addEventListener('change', applyFilters);
+        });
+    </script>
+</body>
+</html>
